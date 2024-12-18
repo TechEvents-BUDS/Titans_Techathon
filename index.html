@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PaliGemma 2  Cavity Detection</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f9f9f9;
+    }
+    h1 { text-align: center; }
+    #upload-container, #result { text-align: center; margin: 20px; }
+    input[type="file"] { margin: 10px 0; }
+    #image-preview img {
+      width: 200px;
+      margin: 10px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+    }
+    #loading { display: none; font-size: 1.2em; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>PaliGemma 2: Oral Cavity Detection</h1>
+  <div id="upload-container">
+    <p>Upload images for 5 tooth surfaces:</p>
+    <input type="file" id="image-upload" accept="image/*" multiple>
+    <button id="analyze-button">Analyze Images</button>
+  </div>
+
+  <div id="image-preview"></div>
+  <p id="loading">Analyzing images... Please wait.</p>
+  <div id="result"></div>
+
+  <script>
+    const uploadInput = document.getElementById("image-upload");
+    const previewContainer = document.getElementById("image-preview");
+    const analyzeButton = document.getElementById("analyze-button");
+    const loadingText = document.getElementById("loading");
+    const resultContainer = document.getElementById("result");
+
+    let uploadedImages = [];
+
+    // Display uploaded images
+    uploadInput.addEventListener("change", () => {
+      previewContainer.innerHTML = "";
+      uploadedImages = [];
+      const files = uploadInput.files;
+
+      for (const file of files) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = document.createElement("img");
+          img.src = e.target.result;
+          previewContainer.appendChild(img);
+          uploadedImages.push(e.target.result); // Store image as base64
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Send images to PaliGemma 2 API
+    analyzeButton.addEventListener("click", async () => {
+      if (uploadedImages.length !== 5) {
+        alert("Please upload exactly 5 images for analysis.");
+        return;
+      }
+
+      resultContainer.innerHTML = "";
+      loadingText.style.display = "block";
+
+      const apiKey = "YOUR_GOOGLE_API_KEY"; // Replace with your API Key
+      const endpoint = "https://generativelanguage.googleapis.com/v1/models/gemini-vision:generateContent";
+
+      try {
+        const responses = await Promise.all(uploadedImages.map(async (image) => {
+          const response = await fetch(`${endpoint}?key=${apiKey}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{ inlineData: { mimeType: "image/jpeg", data: image.split(",")[1] } }]
+              }],
+            }),
+          });
+          return response.json();
+        }));
+
+        loadingText.style.display = "none";
+        responses.forEach((result, index) => {
+          resultContainer.innerHTML += `
+            <p><strong>Surface ${index + 1}:</strong> ${
+              result.candidates?.[0]?.content?.parts?.[0]?.text || "No cavity detected"
+            }</p>
+          `;
+        });
+      } catch (error) {
+        console.error("Error:", error);
+        loadingText.style.display = "none";
+        resultContainer.textContent = "An error occurred during analysis.";
+      }
+    });
+  </script>
+</body>
+</html>
